@@ -1,0 +1,40 @@
+applications:
+- name: payment-api
+  path: target/payment-api-0.0.1-SNAPSHOT.jar
+  memory: 256m
+  health-check-type: http
+  health-check-http-endpoint: /actuator/health/readiness
+  timeout: 180
+  services:
+  - consul # cf create-user-provided-service consul -p "{\"host\": \"sock-consul.example.com\", \"scheme\": \"https\", \"port\": \"443\"}"
+  - prometheus-rsocket-proxy # cf create-user-provided-service prometheus-rsocket-proxy -p '{"host": "rsocket.example.com", "port": 7001}' <-- dummy value should be ok
+  env:
+    SERVER_PORT: 8080
+    JBP_CONFIG_SPRING_AUTO_RECONFIGURATION: '{enabled: false}'
+    SPRING_PROFILES_ACTIVE: consul
+    SERVER_TOMCAT_THREADS_MAX: 4
+    JAVA_OPTS: -XX:ReservedCodeCacheSize=32M -Xss512k -Duser.timezone=Asia/Tokyo
+    JBP_CONFIG_OPEN_JDK_JRE: '{memory_calculator: {stack_threads: 20}, jre: {version: 11.+}}'
+    BPL_JVM_THREAD_COUNT: 20
+    SPRING_CLOUD_CONSUL_HOST: ${vcap.services.consul.credentials.host}
+    SPRING_CLOUD_CONSUL_PORT: ${vcap.services.consul.credentials.port}
+    SPRING_CLOUD_CONSUL_SCHEME: ${vcap.services.consul.credentials.scheme}
+    SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCEID: ${spring.application.name}-${vcap.application.instance_id}
+    SPRING_CLOUD_CONSUL_DISCOVERY_SCHEME: https
+    SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: ${vcap.application.uris[0]}
+    SPRING_CLOUD_CONSUL_DISCOVERY_PORT: 443
+    SPRING_CLOUD_CONSUL_DISCOVERY_CATALOGSERVICESWATCHDELAY: 15000
+    SPRING_CLOUD_LOADBALANCER_ZONE: ${vcap.application.cf_api}
+    SPRING_APPLICATION_JSON: |
+      {
+        "spring.cloud.consul.discovery.health-check-headers[X-Cf-App-Instance]": "${vcap.application.application_id}:${vcap.application.instance_index}",
+        "spring.cloud.consul.discovery.metadata[surgical_routing_header_name]": "X-Cf-App-Instance",
+        "spring.cloud.consul.discovery.metadata[surgical_routing_header_value]": "${vcap.application.application_id}:${vcap.application.instance_index}",
+        "spring.cloud.consul.discovery.metadata[internal_ip]": "${spring.cloud.client.ip-address}",
+        "spring.cloud.consul.discovery.metadata[internal_port]": "8080",
+        "spring.cloud.consul.discovery.metadata[internal_scheme]": "http"
+      }
+    MANAGEMENT_METRICS_TAGS_ORGANIZATION: ${vcap.application.organization_name}
+    MANAGEMENT_METRICS_TAGS_SPACE: ${vcap.application.space_name}
+    MANAGEMENT_METRICS_TAGS_APPLICATION: ${vcap.application.application_name}
+    MANAGEMENT_METRICS_TAGS_INSTANCE_ID: ${management.metrics.tags.application}:${vcap.application.instance_index}
